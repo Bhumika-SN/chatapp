@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatApp</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        :root {
+          --orange:    #E8622A;
+          --orange-d:  #C94E1A;
+          --orange-l:  #F0845A;
+          --dusk-bg:   #1A1210;
+          --dusk-2:    #251A16;
+          --dusk-3:    #31211A;
+          --dusk-4:    #3D2920;
+          --dusk-border:#4A3028;
+          --text-p:    #F0E6E0;
+          --text-s:    #A08070;
+          --mine-bg:   #3D2318;
+          --other-bg:  #251A16;
+          --shadow:    rgba(0,0,0,0.5);
+        }
+        [data-theme="light"] {
+          --dusk-bg:   #FFF5F0;
+          --dusk-2:    #FFFFFF;
+          --dusk-3:    #FDE8DC;
+          --dusk-4:    #FDDDD0;
+          --dusk-border:#F0C4B0;
+          --text-p:    #2A1510;
+          --text-s:    #886050;
+          --mine-bg:   #FFE0D0;
+          --other-bg:  #FFFFFF;
+          --shadow:    rgba(200,100,50,0.12);
+        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Segoe UI',sans-serif;background:var(--dusk-bg);color:var(--text-p);height:100vh;display:flex;align-items:center;justify-content:center;transition:background .3s;}
+
+        /* AUTH */
+        #auth-screen{background:var(--dusk-2);border-radius:18px;padding:44px 40px;width:390px;box-shadow:0 12px 48px var(--shadow);}
+        .auth-logo{text-align:center;margin-bottom:28px;}
+        .auth-logo .icon{width:60px;height:60px;background:var(--orange);border-radius:18px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;}
+        .auth-logo .icon svg{width:30px;height:30px;fill:white;}
+        .auth-logo h1{font-size:24px;font-weight:700;color:var(--text-p);}
+        .auth-logo p{color:var(--text-s);font-size:13px;margin-top:5px;}
+        .auth-tabs{display:flex;background:var(--dusk-3);border-radius:12px;padding:4px;margin-bottom:22px;}
+        .auth-tab{flex:1;padding:10px;border:none;background:none;color:var(--text-s);border-radius:9px;cursor:pointer;font-size:14px;font-weight:500;transition:all .2s;}
+        .auth-tab.active{background:var(--dusk-2);color:var(--text-p);box-shadow:0 2px 8px var(--shadow);}
+        .auth-field{position:relative;margin-bottom:14px;}
+        .auth-field input{width:100%;padding:13px 16px;border:1.5px solid var(--dusk-border);border-radius:11px;background:var(--dusk-3);color:var(--text-p);font-size:14px;outline:none;transition:border-color .2s;}
+        .auth-field input:focus{border-color:var(--orange);}
+        .auth-field label{position:absolute;top:-8px;left:12px;background:var(--dusk-2);padding:0 4px;font-size:11px;color:var(--text-s);}
+        .auth-btn{width:100%;padding:13px;border:none;border-radius:11px;background:var(--orange);color:#fff;font-size:15px;font-weight:700;cursor:pointer;transition:background .2s,transform .1s;margin-bottom:10px;}
+        .auth-btn:hover{background:var(--orange-l);}
+        .auth-btn:active{transform:scale(.98);}
+        .google-btn{width:100%;padding:12px;border:1.5px solid var(--dusk-border);border-radius:11px;background:var(--dusk-3);color:var(--text-p);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:border-color .2s,background .2s;}
+        .google-btn:hover{border-color:var(--orange);background:var(--dusk-4);}
+        .google-btn svg{width:20px;height:20px;}
+        .divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--text-s);font-size:12px;}
+        .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--dusk-border);}
+        .auth-error{color:#ff7055;font-size:13px;margin-bottom:12px;text-align:center;padding:8px;background:rgba(232,98,42,0.12);border-radius:8px;display:none;}
+
+        /* APP */
+        #app{display:none;width:1120px;height:680px;background:var(--dusk-bg);border-radius:18px;overflow:hidden;flex-direction:row;box-shadow:0 12px 48px var(--shadow);}
+
+        /* SIDEBAR */
+        #sidebar{width:340px;background:var(--dusk-2);display:flex;flex-direction:column;border-right:1px solid var(--dusk-border);flex-shrink:0;}
+        #sidebar-top{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--dusk-border);}
+        .s-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;cursor:pointer;flex-shrink:0;overflow:hidden;}
+        .s-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+        .s-actions{display:flex;gap:6px;align-items:center;}
+        .icon-btn{width:36px;height:36px;border:none;background:none;color:var(--text-s);cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;}
+        .icon-btn:hover{background:var(--dusk-3);color:var(--orange);}
+        .icon-btn svg{width:20px;height:20px;}
+        #search-bar{padding:8px 12px;border-bottom:1px solid var(--dusk-border);}
+        .search-wrap{position:relative;}
+        .search-wrap input{width:100%;padding:9px 14px 9px 36px;border:none;border-radius:9px;background:var(--dusk-3);color:var(--text-p);font-size:13px;outline:none;}
+        .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;fill:var(--text-s);}
+        #room-list{flex:1;overflow-y:auto;}
+        .room-item{padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid var(--dusk-border);transition:background .15s;}
+        .room-item:hover,.room-item.active{background:var(--dusk-3);}
+        .room-item.active{border-left:3px solid var(--orange);}
+        .room-av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0;}
+        .room-meta{flex:1;min-width:0;}
+        .room-name-row{display:flex;justify-content:space-between;align-items:center;}
+        .room-name-txt{font-size:15px;font-weight:500;color:var(--text-p);}
+        .room-time{font-size:11px;color:var(--text-s);}
+        .room-preview{font-size:12px;color:var(--text-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;max-width:200px;}
+        #add-room-area{padding:10px 12px;border-top:1px solid var(--dusk-border);display:flex;gap:8px;}
+        #add-room-area input{flex:1;padding:9px 12px;border:1.5px solid var(--dusk-border);border-radius:10px;background:var(--dusk-3);color:var(--text-p);font-size:13px;outline:none;}
+        #add-room-area input:focus{border-color:var(--orange);}
+        #add-room-area button{padding:9px 16px;border:none;border-radius:10px;background:var(--orange);color:#fff;cursor:pointer;font-size:20px;font-weight:bold;transition:background .15s;}
+        #add-room-area button:hover{background:var(--orange-l);}
+
+        /* CHAT */
+        #chat-window{flex:1;display:flex;flex-direction:column;background:var(--dusk-bg);overflow:hidden;}
+        #no-room{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:var(--text-s);}
+        #no-room .nr-icon{width:72px;height:72px;background:var(--dusk-3);border-radius:50%;display:flex;align-items:center;justify-content:center;}
+        #no-room .nr-icon svg{width:36px;height:36px;fill:var(--orange);opacity:.7;}
+        #chat-header{padding:12px 20px;background:var(--dusk-2);display:none;align-items:center;gap:14px;border-bottom:1px solid var(--dusk-border);}
+        .ch-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;}
+        .ch-info .ch-title{font-size:15px;font-weight:600;color:var(--text-p);}
+        .ch-info .ch-sub{font-size:12px;color:var(--text-s);}
+        .ch-actions{margin-left:auto;display:flex;gap:4px;}
+        #search-msg-bar{padding:6px 16px;background:var(--dusk-3);display:none;align-items:center;gap:8px;border-bottom:1px solid var(--dusk-border);}
+        #search-msg-bar input{flex:1;padding:7px 12px;border:none;border-radius:8px;background:var(--dusk-2);color:var(--text-p);font-size:13px;outline:none;}
+        #messages-wrap{flex:1;overflow-y:auto;padding:12px 8%;display:flex;flex-direction:column;gap:3px;}
+        .msg-row{display:flex;flex-direction:column;}
+        .msg-bubble{max-width:64%;padding:8px 13px 5px;border-radius:14px;font-size:14px;line-height:1.55;position:relative;word-break:break-word;}
+        .msg-bubble.mine{background:var(--mine-bg);align-self:flex-end;border-bottom-right-radius:3px;border:1px solid var(--dusk-border);}
+        .msg-bubble.other{background:var(--other-bg);align-self:flex-start;border-bottom-left-radius:3px;border:1px solid var(--dusk-border);}
+        .msg-bubble.starred{border-color:var(--orange)!important;}
+        .msg-sender-name{font-size:11px;font-weight:700;color:var(--orange);margin-bottom:3px;}
+        .msg-deleted{color:var(--text-s);font-style:italic;font-size:13px;}
+        .msg-footer{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:3px;}
+        .msg-time{font-size:10px;color:var(--text-s);}
+        .msg-edited{font-size:10px;color:var(--text-s);font-style:italic;}
+        .msg-ticks{font-size:12px;color:var(--text-s);}
+        .ticks-seen{color:var(--orange);}
+        .msg-reactions{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+        .reaction-chip{background:var(--dusk-3);border-radius:12px;padding:2px 7px;font-size:13px;cursor:pointer;border:1px solid var(--dusk-border);transition:border-color .15s;}
+        .reaction-chip:hover{border-color:var(--orange);}
+        .msg-actions{display:none;position:absolute;right:-108px;top:0;background:var(--dusk-2);border-radius:10px;box-shadow:0 6px 24px var(--shadow);z-index:20;padding:5px;border:1px solid var(--dusk-border);min-width:105px;}
+        .msg-bubble:hover .msg-actions{display:flex;flex-direction:column;}
+        .msg-action-btn{padding:7px 12px;font-size:12px;color:var(--text-p);cursor:pointer;border-radius:6px;white-space:nowrap;transition:background .15s;}
+        .msg-action-btn:hover{background:var(--dusk-3);color:var(--orange);}
+        .msg-action-btn.danger{color:#ff7055;}
+        .reply-preview{background:var(--dusk-3);border-left:3px solid var(--orange);padding:4px 10px;border-radius:4px;margin-bottom:6px;font-size:12px;color:var(--text-s);}
+        .typing-indicator{padding:6px 8%;font-size:12px;color:var(--text-s);font-style:italic;min-height:26px;}
+        #reply-bar{padding:8px 16px;background:var(--dusk-3);display:none;align-items:center;gap:10px;border-top:1px solid var(--dusk-border);}
+        #reply-bar .reply-info{flex:1;font-size:12px;color:var(--text-s);}
+        #reply-bar button{background:none;border:none;color:var(--text-s);cursor:pointer;font-size:18px;}
+        #chat-input-area{padding:10px 16px;background:var(--dusk-2);display:none;align-items:flex-end;gap:10px;border-top:1px solid var(--dusk-border);}
+        .emoji-wrap{position:relative;}
+        #emoji-picker{position:absolute;bottom:50px;left:0;background:var(--dusk-2);border:1px solid var(--dusk-border);border-radius:14px;padding:10px;display:none;z-index:100;width:290px;box-shadow:0 10px 32px var(--shadow);}
+        #emoji-picker.open{display:block;}
+        .emoji-grid{display:flex;flex-wrap:wrap;gap:4px;max-height:180px;overflow-y:auto;}
+        .emoji-btn{font-size:22px;cursor:pointer;padding:4px;border-radius:7px;transition:background .15s;}
+        .emoji-btn:hover{background:var(--dusk-3);}
+        #msg-input{flex:1;padding:11px 16px;border:1.5px solid var(--dusk-border);border-radius:24px;background:var(--dusk-3);color:var(--text-p);font-size:14px;outline:none;resize:none;max-height:120px;font-family:inherit;line-height:1.4;transition:border-color .2s;}
+        #msg-input:focus{border-color:var(--orange);}
+        .send-btn{width:46px;height:46px;border:none;border-radius:50%;background:var(--orange);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,transform .1s;}
+        .send-btn:hover{background:var(--orange-l);}
+        .send-btn:active{transform:scale(.92);}
+        .send-btn svg{width:20px;height:20px;fill:white;}
+
+        /* PROFILE PANEL */
+        #profile-panel{display:none;position:absolute;top:0;left:0;width:340px;height:100%;background:var(--dusk-2);z-index:50;flex-direction:column;border-right:1px solid var(--dusk-border);}
+        #profile-panel.open{display:flex;}
+        .pp-header{padding:60px 24px 24px;background:var(--orange);color:#fff;}
+        .pp-back{position:absolute;top:16px;left:16px;background:none;border:none;color:#fff;cursor:pointer;font-size:22px;}
+        .pp-avatar-wrap{text-align:center;margin-bottom:12px;}
+        .pp-avatar{width:80px;height:80px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;overflow:hidden;}
+        .pp-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+        .pp-name{text-align:center;font-size:20px;font-weight:600;}
+        .pp-body{padding:20px;flex:1;}
+        .pp-label{font-size:11px;color:var(--orange);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+        .pp-field{margin-bottom:20px;}
+        .pp-value{font-size:14px;color:var(--text-p);padding:7px 0;border-bottom:1px solid var(--dusk-border);}
+        .pp-input{width:100%;padding:8px 0;border:none;border-bottom:1.5px solid var(--orange);background:none;color:var(--text-p);font-size:14px;outline:none;}
+        .pp-save{margin-top:16px;width:100%;padding:12px;border:none;border-radius:10px;background:var(--orange);color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s;}
+        .pp-save:hover{background:var(--orange-l);}
+        .theme-row{display:flex;gap:8px;margin-top:6px;}
+        .theme-btn{flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--dusk-border);background:var(--dusk-3);color:var(--text-p);cursor:pointer;font-size:13px;transition:border-color .2s;}
+        .theme-btn:hover{border-color:var(--orange);}
+
+        /* AI summary modal */
+        #ai-modal{display:none;position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;}
+        #ai-modal.open{display:flex;}
+        .ai-box{background:var(--dusk-2);border-radius:16px;padding:28px;width:420px;border:1px solid var(--dusk-border);box-shadow:0 12px 40px var(--shadow);}
+        .ai-box h3{color:var(--orange);margin-bottom:14px;font-size:17px;}
+        .ai-box p{color:var(--text-p);line-height:1.7;font-size:14px;white-space:pre-wrap;}
+        .ai-close{margin-top:18px;width:100%;padding:10px;border:none;border-radius:9px;background:var(--orange);color:#fff;cursor:pointer;font-size:14px;font-weight:600;}
+
+        ::-webkit-scrollbar{width:4px;}
+        ::-webkit-scrollbar-thumb{background:var(--dusk-border);border-radius:2px;}
+    </style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+    <div class="auth-logo">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></div>
+        <h1>ChatApp</h1><p>Connect with anyone, anywhere</p>
+    </div>
+    <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Login</button>
+        <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div class="auth-field"><label>Username</label>
+        <input id="auth-user" type="text" placeholder="Enter username" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+    <div class="auth-field"><label>Password</label>
+        <input id="auth-pass" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+    <button class="auth-btn" onclick="doAuth()" id="auth-btn-main">Login</button>
+    <div class="divider">or continue with</div>
+    <button class="google-btn" onclick="googleLogin()">
+        <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+    </button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+    <!-- AI Modal -->
+    <div id="ai-modal">
+        <div class="ai-box">
+            <h3>🤖 AI Chat Summary</h3>
+            <p id="ai-text">Generating summary...</p>
+            <button class="ai-close" onclick="closeAI()">Close</button>
+        </div>
+    </div>
+
+    <!-- Profile panel -->
+    <div id="profile-panel">
+        <button class="pp-back" onclick="closeProfile()">&#8592;</button>
+        <div class="pp-header">
+            <div class="pp-avatar-wrap"><div class="pp-avatar" id="pp-avatar"></div></div>
+            <div class="pp-name" id="pp-name"></div>
+        </div>
+        <div class="pp-body">
+            <div class="pp-field"><div class="pp-label">Username</div><div class="pp-value" id="pp-username"></div></div>
+            <div class="pp-field"><div class="pp-label">Status</div><input class="pp-input" id="pp-status" type="text" placeholder="What's on your mind?"/></div>
+            <div class="pp-field">
+                <div class="pp-label">Theme</div>
+                <div class="theme-row">
+                    <button class="theme-btn" onclick="setTheme('dark')">🌙 Dark</button>
+                    <button class="theme-btn" onclick="setTheme('light')">☀️ Light</button>
+                </div>
+            </div>
+            <button class="pp-save" onclick="saveProfile()">Save changes</button>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+        <div id="sidebar-top">
+            <div class="s-avatar" id="my-avatar" onclick="openProfile()"></div>
+            <div class="s-actions">
+                <button class="icon-btn" title="Toggle theme" onclick="toggleTheme()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+                </button>
+                <button class="icon-btn" title="Logout" onclick="logout()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div id="search-bar"><div class="search-wrap">
+            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input type="text" placeholder="Search chats..." oninput="filterRooms(this.value)"/>
+        </div></div>
+        <div id="room-list"></div>
+        <div id="add-room-area">
+            <input id="new-room-input" type="text" placeholder="New room..." onkeydown="if(event.key==='Enter')createRoom()"/>
+            <button onclick="createRoom()">+</button>
+        </div>
+    </div>
+
+    <!-- CHAT WINDOW -->
+    <div id="chat-window">
+        <div id="no-room">
+            <div class="nr-icon"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></div>
+            <span style="font-size:16px;font-weight:500;">Select a chat</span>
+            <span style="font-size:13px;">Your messages are private</span>
+        </div>
+        <div id="chat-header">
+            <div class="ch-av" id="ch-av"></div>
+            <div class="ch-info"><div class="ch-title" id="ch-title"></div><div class="ch-sub" id="ch-sub">tap to open</div></div>
+            <div class="ch-actions">
+                <button class="icon-btn" title="Search" onclick="toggleSearchBar()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                </button>
+                <button class="icon-btn" title="AI Summary" onclick="getAISummary()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div id="search-msg-bar">
+            <input type="text" placeholder="Search messages..." oninput="searchInChat(this.value)"/>
+            <button class="icon-btn" onclick="toggleSearchBar()">✕</button>
+        </div>
+        <div id="messages-wrap"></div>
+        <div class="typing-indicator" id="typing-indicator"></div>
+        <div id="reply-bar">
+            <div class="reply-info" id="reply-info"></div>
+            <button onclick="cancelReply()">✕</button>
+        </div>
+        <div id="chat-input-area">
+            <div class="emoji-wrap">
+                <button class="icon-btn" onclick="toggleEmoji()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                </button>
+                <div id="emoji-picker"><div class="emoji-grid" id="emoji-grid"></div></div>
+            </div>
+            <textarea id="msg-input" rows="1" placeholder="Type a message..."
+                      oninput="autoResize(this);handleTyping()"
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+            <button class="send-btn" onclick="sendMessage()">
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const EMOJIS=['😀','😂','😍','🥰','😎','🤔','😢','😡','👍','👎','❤️','🔥','🎉','💯','✅','🙏','😭','🤣','😊','😏','🫡','🤩','💀','😤','🥹','😴','🤓','👀','💬','🚀','⭐','💎','🎯','🏆','💡','🔐'];
+    const REACTS=['❤️','😂','😮','😢','😡','👍'];
+
+    let currentUser=null,currentToken=null,currentRoom=null,currentAvatarUrl=null;
+    let stompClient=null,currentSub=null,typingSub=null,seenSub=null,editSub=null,deleteSub=null,presenceSub=null;
+    let typingTimeout=null,allRooms=[],replyTo=null,isLoginMode=true;
+
+    // ── Check OAuth redirect ──
+    (function(){
+      const p=new URLSearchParams(window.location.search);
+      if(p.get('token')){
+        currentToken=p.get('token');
+        currentUser=p.get('username');
+        currentAvatarUrl=p.get('avatarUrl')||null;
+        localStorage.setItem('chatapp_token',currentToken);
+        localStorage.setItem('chatapp_user',currentUser);
+        if(currentAvatarUrl) localStorage.setItem('chatapp_avatar',currentAvatarUrl);
+        window.history.replaceState({},'','/');
+        enterApp({username:currentUser,avatarUrl:currentAvatarUrl,avatarColor:'#E8622A'});
+      }
+    })();
+
+    function switchTab(m){
+      isLoginMode=m==='login';
+      document.getElementById('tab-login').classList.toggle('active',isLoginMode);
+      document.getElementById('tab-register').classList.toggle('active',!isLoginMode);
+      document.getElementById('auth-btn-main').textContent=isLoginMode?'Login':'Register';
+    }
+
+    async function doAuth(){
+      const u=document.getElementById('auth-user').value.trim();
+      const p=document.getElementById('auth-pass').value.trim();
+      if(!u||!p)return showAuthErr('Please fill all fields');
+      const url=isLoginMode?'/api/auth/login':'/api/auth/register';
+      const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+      const data=await res.json();
+      if(data.error)return showAuthErr(data.error);
+      currentToken=data.token; currentUser=data.username;
+      localStorage.setItem('chatapp_token',currentToken);
+      localStorage.setItem('chatapp_user',currentUser);
+      enterApp(data);
+    }
+
+    function googleLogin(){
+      window.location.href='/oauth2/authorization/google';
+    }
+
+    function showAuthErr(msg){
+      const el=document.getElementById('auth-error');
+      el.textContent=msg; el.style.display='block';
+    }
+
+    function enterApp(data){
+      document.getElementById('auth-screen').style.display='none';
+      document.getElementById('app').style.display='flex';
+      const av=document.getElementById('my-avatar');
+      if(data.avatarUrl){
+        av.innerHTML=`<img src="${data.avatarUrl}" alt=""/>`;
+        currentAvatarUrl=data.avatarUrl;
+      } else {
+        av.textContent=currentUser[0].toUpperCase();
+        av.style.background=data.avatarColor||'#E8622A';
+      }
+      initEmojiPicker();
+      connectWS();
+      loadRooms();
+      applyTheme(localStorage.getItem('chatapp_theme')||'dark');
+    }
+
+    function logout(){
+      if(stompClient){stompClient.send('/app/online',{},JSON.stringify({username:currentUser,online:false}));stompClient.disconnect();}
+      localStorage.clear();
+      location.reload();
+    }
+
+    function connectWS(){
+      const socket=new SockJS('/ws');
+      stompClient=Stomp.over(socket);
+      stompClient.debug=null;
+      stompClient.connect({},()=>{
+        stompClient.send('/app/online',{},JSON.stringify({username:currentUser,online:true}));
+        presenceSub=stompClient.subscribe('/topic/presence',payload=>{
+          const d=JSON.parse(payload.body);
+          if(currentRoom&&d.username!==currentUser)
+            document.getElementById('ch-sub').textContent=d.online?`${d.username} is online`:'';
+        });
+      });
+    }
+
+    function authH(){return{'Content-Type':'application/json','Authorization':'Bearer '+currentToken};}
+
+    async function loadRooms(){
+      const res=await fetch('/api/rooms',{headers:authH()});
+      allRooms=await res.json();
+      renderRooms(allRooms);
+    }
+
+    function renderRooms(rooms){
+      const list=document.getElementById('room-list');
+      list.innerHTML='';
+      rooms.forEach(r=>{
+        const div=document.createElement('div');
+        div.className='room-item'+(currentRoom===r.name?' active':'');
+        div.id='room-'+r.name;
+        const color=strColor(r.name);
+        div.innerHTML=`
+          <div class="room-av" style="background:${color}">${r.name[0].toUpperCase()}</div>
+          <div class="room-meta">
+            <div class="room-name-row">
+              <span class="room-name-txt">${r.pinned?'📌 ':''}${r.name}</span>
+              <span class="room-time" id="rt-${r.name}"></span>
+            </div>
+            <div class="room-preview" id="rp-${r.name}">No messages yet</div>
+          </div>`;
+        div.onclick=()=>openRoom(r.name);
+        list.appendChild(div);
+      });
+    }
+
+    function filterRooms(q){renderRooms(allRooms.filter(r=>r.name.toLowerCase().includes(q.toLowerCase())));}
+
+    async function createRoom(){
+      const name=document.getElementById('new-room-input').value.trim();
+      if(!name)return;
+      await fetch('/api/rooms',{method:'POST',headers:authH(),body:JSON.stringify({name,createdBy:currentUser})});
+      document.getElementById('new-room-input').value='';
+      await loadRooms(); openRoom(name);
+    }
+
+    async function openRoom(roomName){
+      currentRoom=roomName; replyTo=null;
+      document.getElementById('reply-bar').style.display='none';
+      document.getElementById('no-room').style.display='none';
+      ['chat-header','messages-wrap','chat-input-area'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.style.display= id==='messages-wrap'? 'flex' : id==='chat-header'?'flex':'flex';
+        if(id==='messages-wrap') el.style.flexDirection='column';
+      });
+      const color=strColor(roomName);
+      document.getElementById('ch-av').textContent=roomName[0].toUpperCase();
+      document.getElementById('ch-av').style.background=color;
+      document.getElementById('ch-title').textContent=roomName;
+      document.querySelectorAll('.room-item').forEach(el=>el.classList.remove('active'));
+      document.getElementById('room-'+roomName)?.classList.add('active');
+
+      [currentSub,typingSub,seenSub,editSub,deleteSub].forEach(s=>s?.unsubscribe());
+
+      currentSub=stompClient.subscribe(`/topic/room/${roomName}`,payload=>{
+        const d=JSON.parse(payload.body);
+        if(d.type==='reaction') updateReactions(d.message);
+        else{appendMessage(d); updatePreview(roomName,d);}
+      });
+      typingSub=stompClient.subscribe(`/topic/typing/${roomName}`,payload=>{
+        const d=JSON.parse(payload.body);
+        if(d.username!==currentUser)
+          document.getElementById('typing-indicator').textContent=d.typing?`${d.username} is typing...`:'';
+      });
+      seenSub=stompClient.subscribe(`/topic/seen/${roomName}`,payload=>updateSeenTick(JSON.parse(payload.body)));
+      editSub=stompClient.subscribe(`/topic/edit/${roomName}`,payload=>updateMsgContent(JSON.parse(payload.body)));
+      deleteSub=stompClient.subscribe(`/topic/delete/${roomName}`,payload=>updateMsgContent(JSON.parse(payload.body)));
+
+      document.getElementById('messages-wrap').innerHTML='';
+      const res=await fetch(`/api/messages/${roomName}`,{headers:authH()});
+      const msgs=await res.json();
+      msgs.forEach(m=>appendMessage(m));
+      scrollBot();
+    }
+
+    function sendMessage(){
+      const input=document.getElementById('msg-input');
+      const content=input.value.trim();
+      if(!content||!currentRoom||!stompClient)return;
+      stompClient.send('/app/sendMessage',{},JSON.stringify({sender:currentUser,content,roomName:currentRoom,replyToId:replyTo?.id?.toString()}));
+      input.value=''; input.style.height='auto';
+      cancelReply(); stopTyping();
+    }
+
+    function appendMessage(msg){
+      const wrap=document.getElementById('messages-wrap');
+      if(document.getElementById('msg-'+msg.id)){updateMsgContent(msg);return;}
+      const isMine=msg.sender===currentUser;
+      const div=document.createElement('div');
+      div.className='msg-row'; div.id='msg-'+msg.id;
+
+      const replyHtml=msg.replyToId?`<div class="reply-preview">↩ Replying to a message</div>`:'';
+      const contentHtml=msg.deleted
+        ?`<span class="msg-deleted">🚫 This message was deleted</span>`
+        :`<span class="msg-content">${escHtml(msg.content)}</span>`;
+      const editedHtml=msg.edited&&!msg.deleted?`<span class="msg-edited">(edited)</span>`:'';
+      const seenCount=msg.seenBy?msg.seenBy.split(',').filter(Boolean).length:0;
+      const tickHtml=isMine?`<span class="msg-ticks ${seenCount>0?'ticks-seen':''}">${seenCount>0?'✓✓':'✓'}</span>`:'';
+      const starClass=msg.starred?' starred':'';
+      const reactHtml=buildReacts(msg);
+
+      let actHtml='';
+      if(!msg.deleted){
+        actHtml=`<div class="msg-actions">
+          <div class="msg-action-btn" onclick="setReply(${msg.id},'${escJs(msg.sender)}','${escJs(msg.content)}')">↩ Reply</div>
+          ${REACTS.map(e=>`<div class="msg-action-btn" onclick="sendReact(${msg.id},'${e}')">${e}</div>`).join('')}
+          ${isMine?`<div class="msg-action-btn" onclick="startEdit(${msg.id},'${escJs(msg.content)}')">✏️ Edit</div>`:''}
+          ${isMine?`<div class="msg-action-btn danger" onclick="deleteMsg(${msg.id})">🗑️ Delete</div>`:''}
+          <div class="msg-action-btn" onclick="starMsg(${msg.id})">⭐ ${msg.starred?'Unstar':'Star'}</div>
+        </div>`;
+      }
+
+      div.innerHTML=`<div class="msg-bubble ${isMine?'mine':'other'}${starClass}" style="position:relative;">
+        ${replyHtml}
+        ${!isMine?`<div class="msg-sender-name">${msg.sender}</div>`:''}
+        ${contentHtml}
+        <div class="msg-footer">${editedHtml}<span class="msg-time">${msg.formattedTime||''}</span>${tickHtml}</div>
+        <div class="msg-reactions" id="reactions-${msg.id}">${reactHtml}</div>
+        ${actHtml}
+      </div>`;
+
+      wrap.appendChild(div);
+      if(!isMine&&msg.id) setTimeout(()=>stompClient.send('/app/seen',{},JSON.stringify({messageId:msg.id,username:currentUser})),800);
+      scrollBot();
+      updatePreview(currentRoom,msg);
+    }
+
+    function buildReacts(msg){
+      if(!msg.reactions||!msg.reactions.length)return'';
+      const counts={};
+      msg.reactions.forEach(r=>{const[,e]=r.split(':');counts[e]=(counts[e]||0)+1;});
+      return Object.entries(counts).map(([e,c])=>`<span class="reaction-chip" onclick="sendReact(${msg.id},'${e}')">${e} ${c}</span>`).join('');
+    }
+
+    function updateMsgContent(msg){
+      const el=document.getElementById('msg-'+msg.id);
+      if(!el)return;
+      const bubble=el.querySelector('.msg-bubble');
+      if(!bubble)return;
+      if(msg.deleted){
+        const footer=bubble.querySelector('.msg-footer');
+        const timeText=footer?footer.innerHTML:'';
+        bubble.innerHTML=`<span class="msg-deleted">🚫 This message was deleted</span><div class="msg-footer">${timeText}</div>`;
+        return;
+      }
+      const cc=bubble.querySelector('.msg-content');
+      if(cc) cc.textContent=msg.content;
+      const ed=bubble.querySelector('.msg-edited');
+      if(msg.edited&&!ed){
+        const footer=bubble.querySelector('.msg-footer');
+        if(footer) footer.insertAdjacentHTML('afterbegin','<span class="msg-edited">(edited)</span>');
+      }
+      const re=document.getElementById('reactions-'+msg.id);
+      if(re) re.innerHTML=buildReacts(msg);
+      bubble.classList.toggle('starred',!!msg.starred);
+    }
+
+    function updateReactions(msg){
+      const re=document.getElementById('reactions-'+msg.id);
+      if(re) re.innerHTML=buildReacts(msg);
+    }
+
+    function updateSeenTick(msg){
+      const el=document.getElementById('msg-'+msg.id);
+      if(!el)return;
+      const t=el.querySelector('.msg-ticks');
+      if(t){t.textContent='✓✓';t.classList.add('ticks-seen');}
+    }
+
+    function sendReact(msgId,emoji){
+      stompClient.send('/app/react',{},JSON.stringify({messageId:msgId.toString(),username:currentUser,emoji}));
+    }
+
+    function setReply(id,sender,content){
+      replyTo={id,sender,content};
+      document.getElementById('reply-bar').style.display='flex';
+      document.getElementById('reply-info').textContent=`↩ ${sender}: ${content.substring(0,50)}`;
+      document.getElementById('msg-input').focus();
+    }
+    function cancelReply(){replyTo=null;document.getElementById('reply-bar').style.display='none';}
+
+    let editingId=null;
+    function startEdit(id,content){
+      editingId=id;
+      const input=document.getElementById('msg-input');
+      input.value=content; input.focus();
+      input.style.borderColor='var(--orange)';
+    }
+
+    async function deleteMsg(id){
+      const res=await fetch(`/api/messages/${id}/delete`,{method:'PUT',headers:authH(),body:JSON.stringify({username:currentUser})});
+      const data=await res.json();
+      if(data.success) updateMsgContent(data.message);
+    }
+
+    async function starMsg(id){
+      const res=await fetch(`/api/messages/${id}/star`,{method:'PUT',headers:authH(),body:JSON.stringify({username:currentUser})});
+      const data=await res.json();
+      if(data.success){
+        const el=document.getElementById('msg-'+id);
+        if(el) el.querySelector('.msg-bubble')?.classList.toggle('starred',data.starred);
+      }
+    }
+
+    function handleTyping(){
+      const input=document.getElementById('msg-input');
+      if(editingId){
+        clearTimeout(typingTimeout);
+        typingTimeout=setTimeout(async()=>{
+          const content=input.value.trim();
+          if(!content){editingId=null;input.style.borderColor='';return;}
+          const id=editingId; editingId=null; input.style.borderColor='';
+          const res=await fetch(`/api/messages/${id}/edit`,{method:'PUT',headers:authH(),body:JSON.stringify({content,username:currentUser})});
+          const data=await res.json();
+          if(data.success) updateMsgContent(data.message);
+          input.value=''; input.style.height='auto';
+        },1000);
+        return;
+      }
+      if(!stompClient||!currentRoom)return;
+      stompClient.send('/app/typing',{},JSON.stringify({username:currentUser,roomName:currentRoom,typing:true}));
+      clearTimeout(typingTimeout);
+      typingTimeout=setTimeout(stopTyping,2000);
+    }
+
+    function stopTyping(){
+      if(stompClient&&currentRoom)
+        stompClient.send('/app/typing',{},JSON.stringify({username:currentUser,roomName:currentRoom,typing:false}));
+    }
+
+    function toggleSearchBar(){
+      const b=document.getElementById('search-msg-bar');
+      b.style.display=b.style.display==='flex'?'none':'flex';
+      if(b.style.display==='flex') b.querySelector('input').focus();
+    }
+
+    async function searchInChat(q){
+      if(!currentRoom||q.length<2)return;
+      const res=await fetch(`/api/messages/${currentRoom}/search?q=${encodeURIComponent(q)}`,{headers:authH()});
+      const msgs=await res.json();
+      document.getElementById('messages-wrap').innerHTML='';
+      msgs.forEach(m=>appendMessage(m));
+    }
+
+    async function getAISummary(){
+      document.getElementById('ai-modal').classList.add('open');
+      document.getElementById('ai-text').textContent='Generating summary...';
+      const res=await fetch(`/api/messages/${currentRoom}`,{headers:authH()});
+      const msgs=await res.json();
+      if(!msgs.length){document.getElementById('ai-text').textContent='No messages to summarize.';return;}
+      const last20=msgs.slice(-20).map(m=>`${m.sender}: ${m.content}`).join('\n');
+      try{
+        const aiRes=await fetch('https://api.anthropic.com/v1/messages',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            model:'claude-sonnet-4-20250514',max_tokens:400,
+            messages:[{role:'user',content:`Summarize this chat in 3 concise bullet points:\n\n${last20}`}]
+          })
+        });
+        const d=await aiRes.json();
+        document.getElementById('ai-text').textContent=d.content?.[0]?.text||'Could not summarize.';
+      }catch(e){
+        document.getElementById('ai-text').textContent='AI summary unavailable. Add your Anthropic API key to enable this.';
+      }
+    }
+
+    function closeAI(){document.getElementById('ai-modal').classList.remove('open');}
+
+    function updatePreview(roomName,msg){
+      const p=document.getElementById('rp-'+roomName);
+      const t=document.getElementById('rt-'+roomName);
+      if(p) p.textContent=msg.deleted?'Message deleted':`${msg.sender}: ${msg.content}`;
+      if(t) t.textContent=msg.formattedTime||'';
+    }
+
+    function initEmojiPicker(){
+      const grid=document.getElementById('emoji-grid');
+      EMOJIS.forEach(e=>{
+        const btn=document.createElement('span');
+        btn.className='emoji-btn'; btn.textContent=e;
+        btn.onclick=()=>{document.getElementById('msg-input').value+=e;document.getElementById('emoji-picker').classList.remove('open');};
+        grid.appendChild(btn);
+      });
+    }
+
+    function toggleEmoji(){document.getElementById('emoji-picker').classList.toggle('open');}
+    document.addEventListener('click',e=>{if(!e.target.closest('.emoji-wrap'))document.getElementById('emoji-picker').classList.remove('open');});
+
+    function openProfile(){
+      document.getElementById('pp-name').textContent=currentUser;
+      document.getElementById('pp-username').textContent='@'+currentUser;
+      const ppAv=document.getElementById('pp-avatar');
+      if(currentAvatarUrl) ppAv.innerHTML=`<img src="${currentAvatarUrl}" alt=""/>`;
+      else{ppAv.textContent=currentUser[0].toUpperCase();ppAv.style.background='var(--orange)';}
+      document.getElementById('profile-panel').classList.add('open');
+    }
+    function closeProfile(){document.getElementById('profile-panel').classList.remove('open');}
+
+    async function saveProfile(){
+      const status=document.getElementById('pp-status').value;
+      await fetch('/api/auth/profile',{method:'PUT',headers:authH(),body:JSON.stringify({username:currentUser,statusMessage:status})});
+      closeProfile();
+    }
+
+    function applyTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('chatapp_theme',t);}
+    function setTheme(t){applyTheme(t);}
+    function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');}
+
+    function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+    function scrollBot(){const w=document.getElementById('messages-wrap');w.scrollTop=w.scrollHeight;}
+    function strColor(str){const c=['#E8622A','#D4A853','#6B8E6B','#5B8DB8','#9B6B9B','#B87355','#7A8B7A','#C47A55'];let h=0;for(let i=0;i<str.length;i++)h=str.charCodeAt(i)+((h<<5)-h);return c[Math.abs(h)%c.length];}
+    function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function escJs(s){return String(s||'').replace(/'/g,"\\'").replace(/\n/g,'\\n');}
+
+    // Auto-login from localStorage
+    const st=localStorage.getItem('chatapp_token'),su=localStorage.getItem('chatapp_user'),sa=localStorage.getItem('chatapp_avatar');
+    if(st&&su){
+      currentToken=st; currentUser=su; currentAvatarUrl=sa||null;
+      fetch('/api/rooms',{headers:authH()}).then(r=>{if(r.ok)enterApp({username:su,avatarUrl:currentAvatarUrl,avatarColor:'#E8622A'});});
+    }
+
+    applyTheme(localStorage.getItem('chatapp_theme')||'dark');
+</script>
+</body>
+</html>
