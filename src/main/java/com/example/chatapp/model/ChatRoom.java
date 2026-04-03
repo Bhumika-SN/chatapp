@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Data
 @Table(name = "chat_rooms")
 public class ChatRoom {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -18,6 +19,10 @@ public class ChatRoom {
     private String createdBy;
     private LocalDateTime createdAt;
     private boolean pinned;
+
+    // ✅ ADDED
+    private String roomPassword;   // null means no lock
+    private boolean locked;
 
     @PrePersist
     public void prePersist() {

@@ -5,6 +5,7 @@ import com.example.chatapp.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.*;
+import java.util.List;
 
 @Service
 public class ChatService {
@@ -98,5 +99,61 @@ public class ChatService {
 
     public List<User> getOnlineUsers() {
         return userRepository.findAll().stream().filter(User::isOnline).toList();
+    }
+
+    // Lock / unlock room
+    public Map<String, Object> setRoomPassword(String roomName, String password) {
+        Map<String, Object> res = new HashMap<>();
+        chatRoomRepository.findByName(roomName).ifPresentOrElse(room -> {
+            room.setRoomPassword(password);
+            room.setLocked(password != null && !password.isEmpty());
+            chatRoomRepository.save(room);
+            res.put("success", true);
+            res.put("locked", room.isLocked());
+        }, () -> res.put("error", "Room not found"));
+        return res;
+    }
+
+    public Map<String, Object> verifyRoomPassword(String roomName, String password) {
+        Map<String, Object> res = new HashMap<>();
+        chatRoomRepository.findByName(roomName).ifPresentOrElse(room -> {
+            if (!room.isLocked()) { res.put("success", true); return; }
+            if (room.getRoomPassword().equals(password)) res.put("success", true);
+            else res.put("error", "Wrong password");
+        }, () -> res.put("error", "Room not found"));
+        return res;
+    }
+
+    public Map<String, Object> deleteSelectedMessages(List<Long> ids, String username) {
+        Map<String, Object> res = new HashMap<>();
+        ids.forEach(id -> messageRepository.findById(id).ifPresent(m -> {
+            if (m.getSender().equals(username)) {
+                m.setDeleted(true);
+                m.setContent("This message was deleted");
+                messageRepository.save(m);
+            }
+        }));
+        res.put("success", true);
+        res.put("count", ids.size());
+        return res;
+    }
+
+    public Map<String, Object> clearChat(String roomName, String username) {
+        Map<String, Object> res = new HashMap<>();
+        List<Message> msgs = messageRepository.findByRoomNameOrderBySentAtAsc(roomName);
+        msgs.forEach(m -> {
+            m.setDeleted(true);
+            m.setContent("This message was deleted");
+            messageRepository.save(m);
+        });
+        res.put("success", true);
+        return res;
+    }
+
+    public Optional<Message> markSnapViewed(Long id) {
+        return messageRepository.findById(id).map(m -> {
+            m.setSnapViewed(true);
+            return messageRepository.save(m);
+        });
     }
 }

@@ -27,7 +27,12 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**", "/ws/**", "/", "/index.html",
                                 "/css/**", "/js/**", "/images/**", "/*.js", "/*.css",
-                                "/oauth2/**", "/login/oauth2/**"
+                                "/oauth2/**", "/login/oauth2/**",
+
+                                // ✅ ADDED (Step E)
+                                "/uploads/**",
+                                "/api/files/**",
+                                "/api/vault/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -35,6 +40,7 @@ public class SecurityConfig {
                         .successHandler(oAuthSuccessHandler)
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 

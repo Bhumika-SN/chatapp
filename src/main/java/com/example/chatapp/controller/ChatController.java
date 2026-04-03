@@ -7,6 +7,7 @@ import org.springframework.messaging.handler.annotation.*;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
+import java.util.List;
 
 @RestController
 @CrossOrigin("*")
@@ -118,5 +119,41 @@ public class ChatController {
     @GetMapping("/api/users/online")
     public List<User> getOnlineUsers() {
         return chatService.getOnlineUsers();
+    }
+    @PostMapping("/api/rooms/{roomName}/lock")
+    public Map<String, Object> lockRoom(@PathVariable String roomName,
+                                        @RequestBody Map<String, String> body) {
+        return chatService.setRoomPassword(roomName, body.get("password"));
+    }
+
+    @PostMapping("/api/rooms/{roomName}/verify")
+    public Map<String, Object> verifyRoom(@PathVariable String roomName,
+                                          @RequestBody Map<String, String> body) {
+        return chatService.verifyRoomPassword(roomName, body.get("password"));
+    }
+
+    @PostMapping("/api/messages/delete-selected")
+    public Map<String, Object> deleteSelected(@RequestBody Map<String, Object> body) {
+        List<Long> ids = ((List<?>) body.get("ids"))
+                .stream().map(id -> Long.valueOf(id.toString())).toList();
+        return chatService.deleteSelectedMessages(ids, body.get("username").toString());
+    }
+
+    @DeleteMapping("/api/rooms/{roomName}/clear")
+    public Map<String, Object> clearChat(@PathVariable String roomName,
+                                         @RequestParam String username) {
+        Map<String, Object> res = chatService.clearChat(roomName, username);
+        messaging.convertAndSend("/topic/clear/" + roomName, (Object) res);
+        return res;
+    }
+
+    @PutMapping("/api/messages/{id}/snap-viewed")
+    public Map<String, Object> snapViewed(@PathVariable Long id) {
+        Map<String, Object> res = new HashMap<>();
+        chatService.markSnapViewed(id).ifPresent(m -> {
+            res.put("success", true);
+            messaging.convertAndSend("/topic/snap/" + m.getRoomName(), (Object) Map.of("id", id, "viewed", true));
+        });
+        return res;
     }
 }
