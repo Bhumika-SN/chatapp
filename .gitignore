@@ -32,3 +32,5 @@ build/
 ### VS Code ###
 .vscode/
 src/main/resources/application.properties
+
+api key & 0auth key is in applications.properties
