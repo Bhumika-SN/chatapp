@@ -34,3 +34,6 @@ build/
 src/main/resources/application.properties
 
 api key & 0auth key is in applications.properties
+
+
+api key is hidden 
